@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>Never Sleep</title>
+    <welcome file="welcome.html" mime-type="text/html"/>
+    <readme file="readme.html" mime-type="text/html"/>
+    <conclusion file="conclusion.html" mime-type="text/html"/>
+    <options customize="never" require-scripts="false" hostArchitectures="__ARCHITECTURES__"/>
+    <domains enable_anywhere="false" enable_currentUserHome="false" enable_localSystem="true"/>
+    <volume-check>
+        <allowed-os-versions>
+            <os-version min="__MIN_OS__"/>
+        </allowed-os-versions>
+    </volume-check>
+    <choices-outline>
+        <line choice="never-sleep"/>
+    </choices-outline>
+    <choice id="never-sleep" title="Never Sleep" description="Keep your Mac awake while connected to power." visible="false">
+        <pkg-ref id="com.nearby.never-sleep.pkg"/>
+    </choice>
+    <pkg-ref id="com.nearby.never-sleep.pkg" version="__APP_VERSION__" onConclusion="None">never-sleep-component.pkg</pkg-ref>
+    <pkg-ref id="com.nearby.never-sleep.pkg">
+        <must-close>
+            <app id="com.nearby.never-sleep"/>
+        </must-close>
+    </pkg-ref>
+</installer-gui-script>

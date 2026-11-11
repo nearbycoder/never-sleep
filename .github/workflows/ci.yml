@@ -1,0 +1,30 @@
+name: App checks
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Install pinned Rust toolchain
+        run: rustup show
+      - name: Format
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+      - name: Unit and interface tests
+        run: cargo test --locked
+      - name: Validate release scripts
+        run: |
+          for script in scripts/*.sh; do bash -n "$script"; done
+          python3 scripts/test-appcast.py
+          python3 -m py_compile scripts/generate-appcast.py
+          plutil -lint packaging/Info.plist

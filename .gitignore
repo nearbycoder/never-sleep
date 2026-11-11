@@ -1,0 +1,11 @@
+/target/
+/dist/
+/.DS_Store
+
+
+.env
+.env.*
+*.p12
+*.p8
+*.pem
+__pycache__/

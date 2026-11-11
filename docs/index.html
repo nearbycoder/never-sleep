@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#181816">
+  <title>Never Sleep — Keep your Mac awake. Stay in flow.</title>
+  <meta name="description" content="A little macOS utility for uninterrupted work. Keep your Mac awake while plugged in, tuck it into the menu bar, and let your battery rest when you unplug. Free and open source.">
+  <link rel="canonical" href="https://nearbycoder.github.io/never-sleep/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Never Sleep — A little utility. A lot less interruption.">
+  <meta property="og:description" content="Keep your Mac awake on power. Native Glass, a quiet menu bar presence, and no account required. Free and open source.">
+  <meta property="og:url" content="https://nearbycoder.github.io/never-sleep/">
+  <meta property="og:image" content="https://nearbycoder.github.io/never-sleep/assets/app-icon.png">
+  <meta name="twitter:card" content="summary">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="dark-stage">
+    <header class="site-header wrap">
+      <a class="brand" href="./" aria-label="Never Sleep home"><img src="assets/favicon.png" width="36" height="36" alt=""><span>Never Sleep</span></a>
+      <nav aria-label="Main navigation">
+        <a href="#how-it-works">How it works</a>
+        <a href="https://github.com/nearbycoder/never-sleep">GitHub <span aria-hidden="true">↗</span></a>
+        <a class="nav-download" href="https://github.com/nearbycoder/never-sleep/releases/latest/download/Never-Sleep.dmg">Download <span aria-hidden="true">↓</span></a>
+      </nav>
+    </header>
+
+  </div>
+  <main id="main">
+    <div class="dark-stage">
+      <section class="hero wrap" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="tiny-sun" aria-hidden="true">☼</span> A little utility for your Mac</p>
+          <h1 id="hero-title">Stay awake.<br>Stay <span>in flow.</span></h1>
+          <p class="hero-description">The render. The download. The idea that keeps going.<br class="desktop-break"> Keep your Mac awake while it’s plugged in, then let it rest when you unplug.</p>
+          <div class="hero-actions">
+            <a class="button button-amber" href="https://github.com/nearbycoder/never-sleep/releases/latest/download/Never-Sleep.dmg"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.5c0-2 1.6-3 1.7-3.1-.9-1.3-2.2-1.5-2.7-1.5-1.2-.1-2.3.7-2.9.7-.6 0-1.5-.7-2.5-.7-1.3 0-2.5.8-3.2 1.9-1.3 2.3-.3 5.7 1 7.5.6.9 1.3 1.9 2.3 1.9.9 0 1.3-.6 2.5-.6s1.5.6 2.5.6 1.6-.9 2.2-1.8c.7-1 1-2 1-2.1-.1 0-1.9-.7-1.9-2.8zM14.4 6.6c.5-.6.9-1.5.8-2.4-.8 0-1.8.6-2.4 1.2-.5.5-.9 1.4-.8 2.2.9.1 1.8-.4 2.4-1z"/></svg>Download for Mac <span aria-hidden="true">↓</span></a>
+            <span class="download-note">Free. Open source.<br>Apple silicon · macOS 14+</span>
+          </div>
+          <p class="signed-note"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m8 1 5.5 2v4.4c0 3.3-3.6 6.1-5.5 7.1-1.9-1-5.5-3.8-5.5-7.1V3L8 1Z" stroke="currentColor"/><path d="m5.5 7.5 1.7 1.7 3.3-3.4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>Developer ID signed &amp; Apple notarized</p>
+        </div>
+
+        <div class="hero-visual">
+          <div class="orbit orbit-one" aria-hidden="true"></div><div class="orbit orbit-two" aria-hidden="true"></div>
+          <div class="app-window" aria-label="Interactive preview of Never Sleep settings">
+            <div class="window-title"><span class="traffic-lights" aria-hidden="true"><i></i><i></i><i></i></span><span>Never Sleep</span></div>
+            <div class="window-body">
+              <img class="preview-icon" src="assets/app-icon.png" width="92" height="92" alt="Never Sleep’s amber sun and power icon">
+              <p class="app-name">Never Sleep</p>
+              <p class="app-status" id="preview-status"><span></span>Keeping your Mac awake</p>
+              <p class="power-source" id="preview-source">Power adapter connected</p>
+              <div class="settings-group">
+                <div class="setting-row"><span class="setting-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 3v5m6-5v5M6 8h12v3a6 6 0 0 1-6 6v4m-6-13v3a6 6 0 0 0 6 6"/></svg></span><span class="setting-copy"><strong id="awake-label">Keep awake on power</strong><small>Prevent idle sleep while plugged in.</small></span><button class="switch" type="button" role="switch" aria-checked="true" aria-labelledby="awake-label" id="awake-switch"><span></span></button></div>
+                <div class="setting-row"><span class="setting-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="1"/><path d="M12 17v4m-4 0h8"/></svg></span><span class="setting-copy"><strong id="display-label">Keep display awake</strong><small>Keep the screen on while protection is active.</small></span><button class="switch" type="button" role="switch" aria-checked="false" aria-labelledby="display-label" id="display-switch"><span></span></button></div>
+                <div class="setting-row"><span class="setting-symbol" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 16h8"/></svg></span><span class="setting-copy"><strong id="dock-label">Show in Dock</strong><small>Turn off to use only the menu bar.</small></span><button class="switch" type="button" role="switch" aria-checked="false" aria-labelledby="dock-label" id="dock-switch"><span></span></button></div>
+              </div>
+              <div class="app-footnote"><strong>Automatically pauses on battery</strong><p>Resumes when you plug back in. Closing the lid or choosing Sleep still works.</p></div>
+            </div>
+          </div>
+          <div class="preview-controls"><span>Try the preview</span><button id="power-preview" type="button" aria-pressed="false"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="1" y="4" width="12" height="8" rx="2" stroke="currentColor"/><path d="M15 7v2M4 8h6" stroke="currentColor" stroke-linecap="round"/></svg><span>Unplug power</span></button></div>
+          <p class="preview-disclaimer">An interactive illustration. Your Mac’s settings stay unchanged.</p>
+          <span class="sr-only" aria-live="polite" id="preview-announcement"></span>
+        </div>
+      </section>
+      <div class="hero-bottom wrap"><span>Built for long-running things.</span><span>Small app. Quiet presence. <span class="amber-text">Bright idea.</span></span></div>
+  </div>
+
+  <div class="light-stage">
+      <section class="how-section wrap" id="how-it-works" aria-labelledby="how-title">
+        <div class="section-heading"><p class="eyebrow">One less thing to think about</p><h2 id="how-title">Plug in.<br>Carry on.</h2><p>Your Mac already knows when to save energy.<br>Never Sleep knows when to give you more time.</p></div>
+        <div class="steps">
+          <article><span class="step-number">01</span><h3>Power connected.<br>Work uninterrupted.</h3><p>Flip one switch to prevent idle sleep while your Mac is on external power. Keep the display awake too, if you need it.</p></article>
+          <article><span class="step-number">02</span><h3>Unplugged?<br>Battery comes first.</h3><p>Protection pauses when you disconnect power. Plug back in and it resumes automatically. No switching modes by hand.</p></article>
+          <article><span class="step-number">03</span><h3>Close the window.<br>Keep the good thing going.</h3><p>Never Sleep keeps working from the menu bar. Your settings are remembered, so everything feels familiar next time.</p></article>
+        </div>
+      </section>
+
+      <section class="menu-section wrap" aria-labelledby="menu-title">
+        <div class="menu-illustration" aria-label="Illustration of Never Sleep in the macOS menu bar">
+          <div class="desktop-top"><span class="desktop-title">Finder <span>File &nbsp; Edit &nbsp; View</span></span><span class="desktop-right"><span class="menu-sun">☼</span><svg viewBox="0 0 20 16" fill="none" aria-hidden="true"><path d="M2 5a12 12 0 0 1 16 0M5 8a7 7 0 0 1 10 0M8 11a3 3 0 0 1 4 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="10" cy="14" r="1" fill="currentColor"/></svg><span>9:41</span></span></div>
+          <div class="menu-popover"><div class="menu-status"><i></i>Keeping your Mac awake</div><div class="menu-divider"></div><div>Show Never Sleep… <span>⌘,</span></div><div class="menu-checked">✓ &nbsp; Keep awake on external power</div><div class="menu-indent">Keep display awake</div><div class="menu-divider"></div><div>Check for Updates…</div><div class="menu-divider"></div><div>Quit Never Sleep <span>⌘Q</span></div></div>
+          <div class="desktop-caption"><span aria-hidden="true">↖</span>Right here when you need it.</div>
+        </div>
+        <div class="menu-copy"><p class="eyebrow">Less app. More Mac.</p><h2 id="menu-title">Your Dock is<br>crowded enough.</h2><p>Give Never Sleep a small spot in your menu bar. Hide the Dock icon, close the window, and get back to whatever you were doing.</p><p>Native Glass, familiar controls, and a little amber light. It feels right at home.</p><span class="small-detail">Liquid Glass on macOS 26+. Native material on earlier versions.</span></div>
+      </section>
+
+      <section class="principles wrap" aria-label="Designed to be simple">
+        <article><span aria-hidden="true">↗</span><h3>Updates, without the detour.</h3><p>Automatic update checks and a native Sparkle updater keep new releases within reach. You can check from the menu bar, too.</p></article>
+        <article><span aria-hidden="true">⌘</span><h3>At home on your Mac.</h3><p>Built with Rune, AppKit, and macOS power management. No helper daemon or permanent changes to your power settings.</p></article>
+        <article><span aria-hidden="true">◎</span><h3>Yours, without an account.</h3><p>No sign-up, subscription, or analytics. Your preferences stay on your Mac. The source is open for anyone to explore.</p></article>
+      </section>
+
+      <section class="faq-section wrap" aria-labelledby="faq-title"><div><p class="eyebrow">A few good questions</p><h2 id="faq-title">The little<br>details.</h2></div><div class="faq-list">
+        <details><summary>Will it keep my Mac awake on battery?</summary><p>No. Never Sleep prevents idle sleep only while macOS reports external power. Protection pauses on battery and resumes when you plug back in.</p></details>
+        <details><summary>What happens when I close the lid?</summary><p>Closing the lid, choosing Sleep, and emergency system sleep still follow normal macOS behavior. Never Sleep is designed to prevent automatic idle sleep, and it doesn’t disable screen locking.</p></details>
+        <details><summary>Does it have to stay open?</summary><p>The app needs to be running, but its window can stay closed. The menu bar icon gives you quick access to your settings. Quitting releases all sleep protection. Launch at login is not currently registered automatically.</p></details>
+        <details><summary>Which Macs are supported?</summary><p>The download is built for Apple silicon Macs running macOS 14 or later. Liquid Glass is available on macOS 26 and later, with native material on earlier versions. Reduce Transparency is respected.</p></details>
+        <details><summary>Is it really free?</summary><p>Yes. Never Sleep is free and open source under the MIT license. <a href="https://github.com/nearbycoder/never-sleep">Read the code, report an issue, or help make it better on GitHub.</a></p></details>
+      </div></section>
+
+      <section class="closing wrap" aria-labelledby="closing-title"><img src="assets/app-icon.png" width="104" height="104" alt="" loading="lazy"><p class="eyebrow">Keep a good thing going</p><h2 id="closing-title">A little utility.<br>A lot less interruption.</h2><a class="button button-dark" href="https://github.com/nearbycoder/never-sleep/releases/latest/download/Never-Sleep.dmg">Download Never Sleep <span aria-hidden="true">↓</span></a><p class="closing-meta">Free for macOS · Apple silicon · macOS 14+</p></section>
+  </div>
+  </main>
+    <footer class="site-footer wrap"><a class="brand" href="./"><img src="assets/favicon.png" width="28" height="28" alt=""><span>Never Sleep</span></a><span>Made by <a href="https://github.com/nearbycoder">nearbycoder</a>.</span><nav aria-label="Footer navigation"><a href="https://github.com/nearbycoder/never-sleep/releases">Release notes</a><a href="https://github.com/nearbycoder/never-sleep/issues">Support</a><a href="https://github.com/nearbycoder/never-sleep">Source ↗</a></nav></footer>
+</body>
+</html>

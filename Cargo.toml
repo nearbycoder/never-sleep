@@ -1,0 +1,19 @@
+[package]
+name = "never-sleep"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.99.1"
+description = "Keep your Mac awake while connected to power."
+license = "MIT"
+
+[dependencies]
+rune = { git = "https://github.com/anomalyco/rune", rev = "0ea75abef0a6caa014067a88f89518b9a04cce2b", default-features = false, features = ["accessibility", "metal-backend"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.5.2"
+objc2-foundation = { version = "0.2.2", features = ["NSString", "NSObject", "NSThread", "NSGeometry", "NSBundle", "NSError"] }
+objc2-app-kit = { version = "0.2.2", features = ["NSApplication", "NSStatusBar", "NSStatusItem", "NSStatusBarButton", "NSMenu", "NSMenuItem", "NSImage", "NSButton", "NSControl", "NSCell", "NSResponder", "NSView", "NSWorkspace", "NSAccessibility"] }
+
+[profile.release]
+lto = "thin"
+strip = true
