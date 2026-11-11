@@ -19,6 +19,7 @@ pub enum Action {
     Open,
     ToggleEnabled,
     ToggleDisplay,
+    ToggleLid,
     CheckForUpdates,
     ToggleAutomaticChecks,
     ToggleAutomaticDownloads,
@@ -61,6 +62,7 @@ declare_class!(
                 5 => Action::CheckForUpdates,
                 6 => Action::ToggleAutomaticChecks,
                 7 => Action::ToggleAutomaticDownloads,
+                8 => Action::ToggleLid,
                 _ => return,
             };
             // Never allow a Rust unwind through Objective-C's event dispatch.
@@ -81,6 +83,7 @@ pub struct StatusItem {
     status: Retained<NSMenuItem>,
     enabled: Retained<NSMenuItem>,
     display: Retained<NSMenuItem>,
+    lid: Retained<NSMenuItem>,
     check_updates: Retained<NSMenuItem>,
     automatic_checks: Retained<NSMenuItem>,
     automatic_downloads: Retained<NSMenuItem>,
@@ -134,7 +137,9 @@ impl StatusItem {
             menu.addItem(&make_item("Show Never Sleep…", 1, ","));
             let enabled = make_item("Keep awake on external power", 2, "");
             let display = make_item("Keep display awake", 3, "");
+            let lid = make_item("Keep awake with lid closed", 8, "");
             menu.addItem(&enabled);
+            menu.addItem(&lid);
             menu.addItem(&display);
             menu.addItem(&NSMenuItem::separatorItem(main_thread));
             let check_updates = make_item("Check for Updates…", 5, "");
@@ -186,6 +191,7 @@ impl StatusItem {
                 status,
                 enabled,
                 display,
+                lid,
                 check_updates,
                 automatic_checks,
                 automatic_downloads,
@@ -199,6 +205,7 @@ impl StatusItem {
         &self,
         enabled: bool,
         display: bool,
+        lid: bool,
         status: &str,
         updates: crate::updater::UpdateStatus,
     ) {
@@ -207,6 +214,7 @@ impl StatusItem {
         unsafe {
             self.enabled.setState(isize::from(enabled));
             self.display.setState(isize::from(display));
+            self.lid.setState(isize::from(lid));
             self.check_updates.setEnabled(updates.can_check);
             self._target
                 .ivars()

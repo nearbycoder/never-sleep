@@ -74,6 +74,20 @@ fn setting_icon(kind: u8, ink: Color) -> El {
             )
             .stroke(vec![[10.0, 14.0], [10.0, 18.0]], 1.5, ink)
             .stroke(vec![[6.0, 18.0], [14.0, 18.0]], 1.5, ink),
+        // A laptop: screen above a wider base.
+        3 => Shape::new()
+            .stroke(
+                vec![
+                    [4.0, 4.0],
+                    [16.0, 4.0],
+                    [16.0, 13.0],
+                    [4.0, 13.0],
+                    [4.0, 4.0],
+                ],
+                1.5,
+                ink,
+            )
+            .stroke(vec![[1.5, 16.0], [18.5, 16.0]], 1.8, ink),
         _ => Shape::new()
             .stroke(
                 vec![
@@ -171,6 +185,21 @@ pub(crate) fn view(s: &State, cx: &mut Cx<State>) -> El {
         ))
         .child(divider())
         .child(setting(
+            3,
+            "Keep awake with lid closed",
+            "Keep running when you close the lid while plugged in.",
+            switch(
+                "lid-switch",
+                "Keep awake with lid closed",
+                c.lid,
+                ink,
+                accent,
+                State::toggle_lid,
+            ),
+            ink,
+        ))
+        .child(divider())
+        .child(setting(
             1,
             "Keep display awake",
             "Keep the screen on while protection is active.",
@@ -214,7 +243,7 @@ pub(crate) fn view(s: &State, cx: &mut Cx<State>) -> El {
         .child(settings)
         .child(col().w_full().gap(4.0).px(5.0)
             .child(label("Automatically pauses on battery", 11.0, 500.0, ink.alpha(0.72)))
-            .child(label("Resumes when you plug back in. Closing the lid or choosing Sleep still works.", 11.0, 400.0, muted).wrap()));
+            .child(label("Resumes when you plug back in. Choosing Sleep from the Apple menu always works.", 11.0, 400.0, muted).wrap()));
     if let Some(error) = c
         .error
         .as_ref()

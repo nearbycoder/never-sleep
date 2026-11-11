@@ -11,19 +11,37 @@ use crate::power::{self, PowerSource, SleepGuard};
 
 const APP_ID: &str = "com.nearby.never-sleep";
 
+/// What an active guard is currently enforcing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Options {
+    display: bool,
+    lid: bool,
+}
+
 trait Assertion {
-    fn display(&self) -> bool;
+    fn options(&self) -> Options;
+    /// Re-apply global state that something outside this process may reset.
+    fn maintain(&self) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 impl Assertion for SleepGuard {
-    fn display(&self) -> bool {
-        self.keep_display_awake()
+    fn options(&self) -> Options {
+        Options {
+            display: self.keep_display_awake(),
+            lid: self.keep_awake_lid_closed(),
+        }
+    }
+
+    fn maintain(&self) -> Result<(), String> {
+        SleepGuard::maintain(self)
     }
 }
 
 trait PowerBackend {
     fn source(&mut self) -> Result<PowerSource, String>;
-    fn acquire(&mut self, display: bool) -> Result<Box<dyn Assertion>, String>;
+    fn acquire(&mut self, options: Options) -> Result<Box<dyn Assertion>, String>;
 }
 
 struct NativePower;
@@ -33,16 +51,17 @@ impl PowerBackend for NativePower {
         power::power_source()
     }
 
-    fn acquire(&mut self, display: bool) -> Result<Box<dyn Assertion>, String> {
-        SleepGuard::new(display).map(|guard| Box::new(guard) as Box<dyn Assertion>)
+    fn acquire(&mut self, options: Options) -> Result<Box<dyn Assertion>, String> {
+        SleepGuard::new(options.display, options.lid)
+            .map(|guard| Box::new(guard) as Box<dyn Assertion>)
     }
 }
 
 struct PreviewPower(PowerSource);
-struct PreviewAssertion(bool);
+struct PreviewAssertion(Options);
 
 impl Assertion for PreviewAssertion {
-    fn display(&self) -> bool {
+    fn options(&self) -> Options {
         self.0
     }
 }
@@ -52,14 +71,16 @@ impl PowerBackend for PreviewPower {
         Ok(self.0)
     }
 
-    fn acquire(&mut self, display: bool) -> Result<Box<dyn Assertion>, String> {
-        Ok(Box::new(PreviewAssertion(display)))
+    fn acquire(&mut self, options: Options) -> Result<Box<dyn Assertion>, String> {
+        Ok(Box::new(PreviewAssertion(options)))
     }
 }
 
 pub struct Controller {
     pub enabled: bool,
     pub display: bool,
+    /// Also ignore closing the lid while protection is active.
+    pub lid: bool,
     pub show_in_dock: bool,
     pub source: PowerSource,
     /// The current power-source or assertion failure, cleared after recovery.
@@ -73,6 +94,9 @@ pub struct Controller {
 
 impl Controller {
     pub fn new() -> Self {
+        // A previous run that was force-quit alongside its watchdog could have
+        // left lid sleep disabled. Start from macOS's normal behavior.
+        power::clear_lid_override();
         Self::with_backend(Prefs::open(APP_ID), Box::new(NativePower))
     }
 
@@ -92,6 +116,8 @@ impl Controller {
         let mut controller = Self {
             enabled: settings.get("enabled").copied().unwrap_or(false),
             display: settings.get("display").copied().unwrap_or(false),
+            // On by default: "never sleep on power" includes closing the lid.
+            lid: settings.get("lid").copied().unwrap_or(true),
             show_in_dock: settings.get("show_in_dock").copied().unwrap_or(true),
             source: PowerSource::Unknown,
             error: None,
@@ -138,6 +164,12 @@ impl Controller {
         self.refresh();
     }
 
+    pub fn toggle_lid(&mut self) {
+        self.lid = !self.lid;
+        self.save();
+        self.refresh();
+    }
+
     pub fn toggle_show_in_dock(&mut self) {
         self.show_in_dock = !self.show_in_dock;
         self.save();
@@ -166,21 +198,28 @@ impl Controller {
             self.guard = None;
             return;
         }
-        if self
+        let options = Options {
+            display: self.display,
+            lid: self.lid,
+        };
+        if let Some(guard) = self
             .guard
             .as_ref()
-            .is_some_and(|guard| guard.display() == self.display)
+            .filter(|guard| guard.options() == options)
         {
+            if let Err(error) = guard.maintain() {
+                self.error = Some(format!("Could not keep awake with the lid closed: {error}"));
+            }
             return;
         }
         // Acquire first so a successful option change doesn't briefly permit
-        // idle sleep. A failure drops the old guard as well: keeping it could
-        // leave the display awake after the user explicitly turned that off.
-        match self.backend.acquire(self.display) {
+        // sleep. A failure drops the old guard as well: keeping it could leave
+        // the display or lid override on after the user turned it off.
+        match self.backend.acquire(options) {
             Ok(guard) => self.guard = Some(guard),
             Err(error) => {
                 self.guard = None;
-                self.error = Some(format!("Could not prevent idle sleep: {error}"));
+                self.error = Some(format!("Could not prevent sleep: {error}"));
             }
         }
     }
@@ -189,6 +228,7 @@ impl Controller {
         let settings = BTreeMap::from([
             ("enabled", self.enabled),
             ("display", self.display),
+            ("lid", self.lid),
             ("show_in_dock", self.show_in_dock),
         ]);
         self.save_error = self
@@ -209,27 +249,41 @@ mod tests {
         source: Result<PowerSource, String>,
         fail_acquire: bool,
         events: Vec<String>,
+        maintained: usize,
     }
 
     struct FakePower(Rc<RefCell<FakeState>>);
     struct FakeAssertion {
         state: Rc<RefCell<FakeState>>,
-        display: bool,
+        options: Options,
     }
 
     impl Assertion for FakeAssertion {
-        fn display(&self) -> bool {
-            self.display
+        fn options(&self) -> Options {
+            self.options
+        }
+
+        fn maintain(&self) -> Result<(), String> {
+            self.state.borrow_mut().maintained += 1;
+            Ok(())
         }
     }
 
     impl Drop for FakeAssertion {
         fn drop(&mut self) {
-            self.state
-                .borrow_mut()
-                .events
-                .push(format!("release:{}", self.display));
+            let event = format!("release:{}", label(self.options));
+            self.state.borrow_mut().events.push(event);
         }
+    }
+
+    /// Display flag, plus "-lid" only when the lid override is off, so the
+    /// default (lid on) keeps the original event names readable.
+    fn label(options: Options) -> String {
+        format!(
+            "{}{}",
+            options.display,
+            if options.lid { "" } else { "-lid" }
+        )
     }
 
     impl PowerBackend for FakePower {
@@ -237,15 +291,15 @@ mod tests {
             self.0.borrow().source.clone()
         }
 
-        fn acquire(&mut self, display: bool) -> Result<Box<dyn Assertion>, String> {
+        fn acquire(&mut self, options: Options) -> Result<Box<dyn Assertion>, String> {
             let mut state = self.0.borrow_mut();
-            state.events.push(format!("acquire:{display}"));
+            state.events.push(format!("acquire:{}", label(options)));
             if state.fail_acquire {
                 return Err("test failure".into());
             }
             Ok(Box::new(FakeAssertion {
                 state: self.0.clone(),
-                display,
+                options,
             }))
         }
     }
@@ -255,6 +309,7 @@ mod tests {
             source: Ok(PowerSource::Ac),
             fail_acquire: false,
             events: Vec::new(),
+            maintained: 0,
         }));
         let controller =
             Controller::with_backend(Prefs::memory(), Box::new(FakePower(state.clone())));
@@ -349,6 +404,42 @@ mod tests {
     }
 
     #[test]
+    fn lid_override_is_on_by_default_toggles_and_is_maintained_while_active() {
+        let (mut controller, state) = fixture();
+        assert!(controller.lid, "keeping awake includes closing the lid");
+        controller.toggle_enabled();
+        assert_eq!(state.borrow().maintained, 0);
+        controller.refresh();
+        controller.refresh();
+        assert_eq!(
+            state.borrow().maintained,
+            2,
+            "the global override is re-applied while active"
+        );
+
+        controller.toggle_lid();
+        assert!(controller.active() && !controller.lid);
+        state.borrow_mut().source = Ok(PowerSource::Battery);
+        controller.refresh();
+        assert!(!controller.active());
+        assert_eq!(
+            state.borrow().events,
+            [
+                "acquire:false",
+                "acquire:false-lid",
+                "release:false",
+                "release:false-lid"
+            ]
+        );
+        assert!(
+            !controller
+                .prefs
+                .get::<BTreeMap<String, bool>>("settings")
+                .unwrap()["lid"]
+        );
+    }
+
+    #[test]
     fn changing_display_while_on_battery_does_not_acquire() {
         let (mut controller, state) = fixture();
         state.borrow_mut().source = Ok(PowerSource::Battery);
@@ -387,6 +478,7 @@ mod tests {
             controller.show_in_dock,
             "existing users retain their Dock icon"
         );
+        assert!(controller.lid, "existing users gain lid-closed protection");
         assert!(controller.active());
         assert_eq!(state.borrow().events, ["acquire:false"]);
 

@@ -59,14 +59,15 @@ Publishing a GitHub release refreshes the Pages download metadata and signed fee
 ## Use
 
 - Turn on **Keep awake on power**. It prevents automatic idle sleep whenever macOS reports external power, including when the battery is fully charged.
+- **Keep awake with lid closed** (on by default) also keeps the Mac running when you close the lid while protection is active, like a closed-display mode. Unplugging restores normal lid sleep within two seconds, so a closed Mac on battery sleeps as usual.
 - Turn on **Keep display awake** to also prevent display idle sleep while protection is active. This option alone does not enable protection.
 - Unplugging pauses protection; reconnecting resumes it. Power is checked every two seconds, including while the window is closed. Battery, UPS, unknown power, and power-read failures release protection.
 - Turn off **Show in Dock** for menu-bar-only mode. The Dock icon disappears immediately and the choice persists across launches. Turn it back on to restore the Dock icon.
 - Close the window or click **Done** to keep running. Use the menu bar sun icon → **Show Never Sleep…** to reopen settings, change the power toggles, or quit. When enabled, the Dock icon also reopens the window.
 - **⌘K** toggles keep-awake, **⌘W** closes the window, and **⌘Q** quits. Tab and Space operate the switches.
-- The power toggles start off; **Show in Dock** starts on. Settings persist between launches in `~/Library/Application Support/com.nearby.never-sleep/prefs.json`.
+- **Keep awake on power** and **Keep display awake** start off; **Keep awake with lid closed** and **Show in Dock** start on. Settings persist between launches in `~/Library/Application Support/com.nearby.never-sleep/prefs.json`.
 
-No administrator privileges, helper daemon, or permanent `pmset` changes are needed. Quitting releases all assertions. Lid closure, manual Sleep, and emergency system sleep still follow macOS behavior. This app doesn't disable screen locking. It must be running for protection to work; it does not register itself to launch at login.
+No administrator privileges, helper daemon, or permanent `pmset` changes are needed. Quitting releases all assertions. macOS ignores power assertions when the lid closes, so the lid option instead asks the kernel's power manager to skip clamshell sleep. That switch is system-wide and outlives the process, so Never Sleep clears it whenever protection ends, at every launch, and from a small watchdog process (the same binary, `--lid-override-watchdog`) that restores normal lid sleep the moment the app quits or crashes. Manual Sleep and emergency thermal sleep still follow macOS behavior. This app doesn't disable screen locking. It must be running for protection to work; it does not register itself to launch at login.
 
 ## Verify
 

@@ -1,8 +1,13 @@
-//! Temporary, process-owned macOS sleep assertions. No `pmset` preferences change.
+//! Temporary macOS sleep prevention. No `pmset` preferences change.
 //!
-//! These assertions prevent automatic idle sleep, not explicit Sleep commands,
-//! lid-close sleep, shutdown, or emergency thermal/low-power sleep. The app must
-//! keep checking the power source and drop its guard when AC power is removed.
+//! Process-owned assertions prevent automatic idle sleep. macOS ignores them
+//! when the lid closes, so an optional lid override asks the kernel's power
+//! root domain to skip clamshell sleep (the mechanism closed-display utilities
+//! use). Unlike assertions, that override is global and is *not* released when
+//! this process exits: the guard clears it on drop, a watchdog child clears it
+//! if the app quits or crashes, and every launch clears stale state. Neither
+//! blocks an explicit Sleep command, shutdown, or emergency thermal sleep. The
+//! app must keep checking the power source and drop its guard on battery.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PowerSource {
@@ -23,13 +28,19 @@ pub fn power_source() -> Result<PowerSource, String> {
     platform::power_source()
 }
 
-pub use platform::SleepGuard;
+pub use platform::{SleepGuard, clear_lid_override, run_lid_watchdog};
+
+/// Hidden argument that starts the lid-override watchdog instead of the app.
+pub const LID_WATCHDOG_ARG: &str = "--lid-override-watchdog";
 
 #[cfg(target_os = "macos")]
 mod platform {
-    use super::PowerSource;
+    use super::{LID_WATCHDOG_ARG, PowerSource};
     use std::ffi::{CStr, c_char, c_void};
+    use std::io::Read;
+    use std::process::{ChildStdin, Command, Stdio};
     use std::ptr::{self, NonNull};
+    use std::sync::Mutex;
 
     type CfRef = *const c_void;
     const UTF8: u32 = 0x0800_0100;
@@ -61,6 +72,19 @@ mod platform {
             assertion_id: *mut u32,
         ) -> i32;
         fn IOPMAssertionRelease(assertion_id: u32) -> i32;
+        fn IOServiceMatching(name: *const c_char) -> CfRef;
+        fn IOServiceGetMatchingService(main_port: u32, matching: CfRef) -> u32;
+        fn IOServiceOpen(service: u32, owning_task: u32, kind: u32, connect: *mut u32) -> i32;
+        fn IOServiceClose(connect: u32) -> i32;
+        fn IOObjectRelease(object: u32) -> i32;
+        fn IOConnectCallScalarMethod(
+            connection: u32,
+            selector: u32,
+            input: *const u64,
+            input_count: u32,
+            output: *mut u64,
+            output_count: *mut u32,
+        ) -> i32;
         #[cfg(test)]
         fn IOPMAssertionCopyProperties(assertion_id: u32) -> CfRef;
     }
@@ -161,6 +185,132 @@ mod platform {
         }
     }
 
+    unsafe extern "C" {
+        static mach_task_self_: u32;
+    }
+
+    /// IOPMLibDefs.h: RootDomainUserClient selector that disables lid sleep.
+    const SET_CLAMSHELL_SLEEP_STATE: u32 = 12;
+
+    /// Set whether closing the lid is ignored. This is system-wide state that
+    /// survives this process, so every enable must be paired with a clear.
+    fn set_lid_sleep_disabled(disabled: bool) -> Result<(), String> {
+        // SAFETY: IOServiceMatching returns a +1 dictionary that
+        // IOServiceGetMatchingService always consumes. A zero service is
+        // checked; the returned service and connection are released below.
+        unsafe {
+            let matching = IOServiceMatching(c"IOPMrootDomain".as_ptr());
+            if matching.is_null() {
+                return Err("macOS could not locate power management.".into());
+            }
+            let service = IOServiceGetMatchingService(0, matching);
+            if service == 0 {
+                return Err("macOS could not locate power management.".into());
+            }
+            let mut connection = 0;
+            let opened = IOServiceOpen(service, mach_task_self_, 0, &mut connection);
+            IOObjectRelease(service);
+            if opened != 0 {
+                return Err(format!(
+                    "macOS refused lid control (IOKit error 0x{:08x}).",
+                    opened as u32
+                ));
+            }
+            let value = u64::from(disabled);
+            let result = IOConnectCallScalarMethod(
+                connection,
+                SET_CLAMSHELL_SLEEP_STATE,
+                &value,
+                1,
+                ptr::null_mut(),
+                ptr::null_mut(),
+            );
+            IOServiceClose(connection);
+            if result != 0 {
+                return Err(format!(
+                    "macOS could not change lid sleep (IOKit error 0x{:08x}).",
+                    result as u32
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Restore normal lid-close sleep, e.g. after a previous run was killed.
+    pub fn clear_lid_override() {
+        if let Err(error) = set_lid_sleep_disabled(false) {
+            eprintln!("Never Sleep: {error}");
+        }
+    }
+
+    /// The write end of the watchdog's stdin. It closes only when this process
+    /// exits (normally, by crash, or by signal), which wakes the watchdog.
+    static WATCHDOG: Mutex<Option<ChildStdin>> = Mutex::new(None);
+
+    fn ensure_watchdog() -> Result<(), String> {
+        let mut watchdog = WATCHDOG.lock().unwrap_or_else(|poison| poison.into_inner());
+        if watchdog.is_some() {
+            return Ok(());
+        }
+        let executable = std::env::current_exe()
+            .map_err(|error| format!("could not start the lid safety monitor: {error}"))?;
+        let mut child = Command::new(executable)
+            .arg(LID_WATCHDOG_ARG)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .map_err(|error| format!("could not start the lid safety monitor: {error}"))?;
+        *watchdog = child.stdin.take();
+        // The child is intentionally never waited on: it outlives this process
+        // and is reparented to launchd, which reaps it.
+        Ok(())
+    }
+
+    /// Body of the watchdog process: wait for the app to go away, then make
+    /// sure closing the lid sleeps the Mac again.
+    pub fn run_lid_watchdog() -> ! {
+        let mut stdin = std::io::stdin().lock();
+        let mut buffer = [0_u8; 64];
+        // The app never writes; any return (EOF or error) means it is gone.
+        while matches!(stdin.read(&mut buffer), Ok(n) if n > 0) {}
+        clear_lid_override();
+        std::process::exit(0);
+    }
+
+    /// Live `LidOverride`s. The kernel flag is a single switch, so a new
+    /// guard acquired before the old one is released must not be undone by
+    /// the old guard's drop.
+    static LID_HOLDERS: Mutex<usize> = Mutex::new(0);
+
+    /// Keeps the Mac awake with its lid closed until the last one is dropped.
+    struct LidOverride;
+
+    impl LidOverride {
+        fn create() -> Result<Self, String> {
+            // Never enable a global override without a way to undo it on exit.
+            ensure_watchdog()?;
+            let mut holders = LID_HOLDERS
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner());
+            set_lid_sleep_disabled(true)?;
+            *holders += 1;
+            Ok(Self)
+        }
+    }
+
+    impl Drop for LidOverride {
+        fn drop(&mut self) {
+            let mut holders = LID_HOLDERS
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner());
+            *holders = holders.saturating_sub(1);
+            if *holders == 0 {
+                clear_lid_override();
+            }
+        }
+    }
+
     /// Holds the assertions until dropped. Construct only while policy permits.
     ///
     /// An optional display assertion keeps an already-awake display awake; it
@@ -168,10 +318,11 @@ mod platform {
     pub struct SleepGuard {
         _system: Assertion,
         display: Option<Assertion>,
+        lid: Option<LidOverride>,
     }
 
     impl SleepGuard {
-        pub fn new(keep_display_awake: bool) -> Result<Self, String> {
+        pub fn new(keep_display_awake: bool, keep_awake_lid_closed: bool) -> Result<Self, String> {
             // Do not use PreventSystemSleep: Apple's IOPMLib.h explicitly marks
             // that type unsupported. The supported idle assertion is sufficient.
             let system = Assertion::create(
@@ -186,16 +337,35 @@ mod platform {
             } else {
                 None
             };
-            // If creating the display assertion fails, the system guard above
-            // is dropped automatically. There is no partially enabled session.
+            let lid = if keep_awake_lid_closed {
+                Some(LidOverride::create()?)
+            } else {
+                None
+            };
+            // If a later step fails, the guards above are dropped automatically.
+            // There is no partially enabled session.
             Ok(Self {
                 _system: system,
                 display,
+                lid,
             })
         }
 
         pub fn keep_display_awake(&self) -> bool {
             self.display.is_some()
+        }
+
+        pub fn keep_awake_lid_closed(&self) -> bool {
+            self.lid.is_some()
+        }
+
+        /// Re-apply the lid override, which is global state another app (or a
+        /// previous instance's watchdog during a relaunch) may have cleared.
+        pub fn maintain(&self) -> Result<(), String> {
+            if self.lid.is_some() {
+                set_lid_sleep_disabled(true)?;
+            }
+            Ok(())
         }
     }
 
@@ -219,7 +389,7 @@ mod platform {
         #[ignore = "briefly acquires real macOS assertions; run explicitly on a Mac"]
         fn native_assertions_are_released_on_drop() {
             for display_enabled in [false, true] {
-                let guard = SleepGuard::new(display_enabled).expect("create assertions");
+                let guard = SleepGuard::new(display_enabled, false).expect("create assertions");
                 assert_eq!(guard.keep_display_awake(), display_enabled);
                 let system_id = guard._system.0;
                 let display_id = guard.display.as_ref().map(|value| value.0);
@@ -247,13 +417,27 @@ mod platform {
 
     pub struct SleepGuard;
 
+    pub fn clear_lid_override() {}
+
+    pub fn run_lid_watchdog() -> ! {
+        std::process::exit(0)
+    }
+
     impl SleepGuard {
-        pub fn new(_: bool) -> Result<Self, String> {
+        pub fn new(_: bool, _: bool) -> Result<Self, String> {
             Err("Sleep prevention is available only on macOS.".into())
         }
 
         pub fn keep_display_awake(&self) -> bool {
             false
+        }
+
+        pub fn keep_awake_lid_closed(&self) -> bool {
+            false
+        }
+
+        pub fn maintain(&self) -> Result<(), String> {
+            Ok(())
         }
     }
 }

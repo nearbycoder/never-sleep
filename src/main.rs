@@ -59,6 +59,7 @@ impl State {
             menu.update(
                 self.controller.enabled,
                 self.controller.display,
+                self.controller.lid,
                 self.controller.status(),
                 self.updater
                     .as_ref()
@@ -74,6 +75,11 @@ impl State {
 
     fn toggle_display(&mut self) {
         self.controller.toggle_display();
+        self.sync_menu();
+    }
+
+    fn toggle_lid(&mut self) {
+        self.controller.toggle_lid();
         self.sync_menu();
     }
 
@@ -121,6 +127,10 @@ fn on_key(s: &mut State, event: &KeyEvent, tx: &mut Tx) -> bool {
 }
 
 fn main() {
+    // The lid-override watchdog is this same binary, started without any UI.
+    if std::env::args().nth(1).as_deref() == Some(power::LID_WATCHDOG_ARG) {
+        power::run_lid_watchdog();
+    }
     let app = App::new(AppSpec::<State> {
         min_size: Some((420.0, 560.0)),
         families: ("System Font", "ui-monospace"),
@@ -203,6 +213,7 @@ fn main() {
                         Action::Quit => actions.quit(),
                         Action::ToggleEnabled => actions.update(|s, _| s.toggle_enabled()),
                         Action::ToggleDisplay => actions.update(|s, _| s.toggle_display()),
+                        Action::ToggleLid => actions.update(|s, _| s.toggle_lid()),
                         Action::CheckForUpdates => actions.update(|s, _| {
                             if let Some(updater) = &s.updater {
                                 updater.check();
@@ -256,7 +267,7 @@ mod tests {
         let state = State::with_controller(Controller::preview(PowerSource::Ac, false, false));
         let mut rt = Runtime::new(state, ui::view, (560.0, 700.0), Env::new(false, 2.0));
         rt.frame(0.0);
-        for key in ["enable-switch", "display-switch"] {
+        for key in ["enable-switch", "display-switch", "lid-switch"] {
             let (x, y) = rt.find(key).expect("setting must be reachable");
             rt.pointer_down(x, y);
             rt.pointer_up(x, y);
@@ -264,6 +275,10 @@ mod tests {
         }
         assert!(rt.state.controller.active());
         assert!(rt.state.controller.display);
+        assert!(
+            !rt.state.controller.lid,
+            "the lid switch toggled its default off"
+        );
         let (x, y) = rt.find("enable-switch").unwrap();
         rt.pointer_down(x, y);
         rt.pointer_up(x, y);
