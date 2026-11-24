@@ -88,7 +88,7 @@ cargo run --locked -- --snap target/active.png --tree target/active.json --scene
 cargo run --locked -- --snap target/battery.png --scene battery --theme dark --size 540x660
 ```
 
-Scenes: `active`, `display`, `battery`, `off`, `unknown`. These are simulated states for UI development. Headless runs and HTML exports never create power assertions, write your settings, or add a menu bar item. Native windows always replace fixtures with live power management and your saved preferences.
+These flags come from Rune's development tooling, which debug builds include and release builds leave out, so use `cargo run` rather than the packaged app. Scenes: `active`, `display`, `battery`, `off`, `unknown`. These are simulated states for UI development. Headless runs and HTML exports never create power assertions, write your settings, or add a menu bar item. Native windows always replace fixtures with live power management and your saved preferences.
 
 For manual verification, enable protection on AC and run `pmset -g assertions`: the `never-sleep` process should own `PreventUserIdleSystemSleep` and, if selected, `PreventUserIdleDisplaySleep`. Unplug, disable protection, or quit and those assertions should disappear. A different app may still hold its own assertions.
 
@@ -102,4 +102,4 @@ For manual verification, enable protection on AC and run `pmset -g assertions`: 
 - `assets/app-icon.png`: full-resolution icon artwork, generated with the built-in image generation tool; the exact prompt is in `assets/app-icon-prompt.txt`.
 - `scripts/make-icon.swift`: converts the committed artwork to all native icon sizes, preserving alpha.
 
-Rune is pre-release; its Git revision and the dependency lockfile are pinned for reproducible builds.
+Rune is pre-release; its Git revision and the dependency lockfile are pinned for reproducible builds. Cargo doesn't inherit a dependency's `[patch.crates-io]`, so `Cargo.toml` mirrors Rune's patch table at the same revision. When bumping Rune, move every `rev` together and check Rune's root `Cargo.toml` at the new revision for added or removed patches.

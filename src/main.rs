@@ -131,6 +131,9 @@ fn main() {
     if std::env::args().nth(1).as_deref() == Some(power::LID_WATCHDOG_ARG) {
         power::run_lid_watchdog();
     }
+    // Every quit (⌘Q, the menu bar, the Dock, logout) ends with Rune's fast
+    // exit, which skips destructors. Restore lid sleep as its last step.
+    rune::fast_exit(power::release_at_exit);
     let app = App::new(AppSpec::<State> {
         min_size: Some((420.0, 560.0)),
         families: ("System Font", "ui-monospace"),

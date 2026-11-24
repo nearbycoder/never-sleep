@@ -4,8 +4,9 @@
 //! when the lid closes, so an optional lid override asks the kernel's power
 //! root domain to skip clamshell sleep (the mechanism closed-display utilities
 //! use). Unlike assertions, that override is global and is *not* released when
-//! this process exits: the guard clears it on drop, a watchdog child clears it
-//! if the app quits or crashes, and every launch clears stale state. Neither
+//! this process exits: the guard clears it on drop, the quit's last step clears
+//! it (Rune's fast exit skips destructors), a watchdog child clears it if the
+//! app crashes or is killed, and every launch clears stale state. Neither
 //! blocks an explicit Sleep command, shutdown, or emergency thermal sleep. The
 //! app must keep checking the power source and drop its guard on battery.
 
@@ -28,7 +29,7 @@ pub fn power_source() -> Result<PowerSource, String> {
     platform::power_source()
 }
 
-pub use platform::{SleepGuard, clear_lid_override, run_lid_watchdog};
+pub use platform::{SleepGuard, clear_lid_override, release_at_exit, run_lid_watchdog};
 
 /// Hidden argument that starts the lid-override watchdog instead of the app.
 pub const LID_WATCHDOG_ARG: &str = "--lid-override-watchdog";
@@ -311,6 +312,19 @@ mod platform {
         }
     }
 
+    /// The quit's final step. Rune ends the process right after its quit hooks
+    /// without dropping app state, so a held `LidOverride` never runs `Drop`.
+    /// Restore lid sleep here exactly when dropping the last guard would have.
+    /// Assertions need nothing: macOS releases them when the process exits.
+    pub fn release_at_exit() {
+        let holders = LID_HOLDERS
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        if *holders > 0 {
+            clear_lid_override();
+        }
+    }
+
     /// Holds the assertions until dropped. Construct only while policy permits.
     ///
     /// An optional display assertion keeps an already-awake display awake; it
@@ -418,6 +432,8 @@ mod platform {
     pub struct SleepGuard;
 
     pub fn clear_lid_override() {}
+
+    pub fn release_at_exit() {}
 
     pub fn run_lid_watchdog() -> ! {
         std::process::exit(0)

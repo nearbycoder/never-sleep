@@ -1,13 +1,26 @@
 [package]
 name = "never-sleep"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2024"
 rust-version = "1.99.1"
 description = "Keep your Mac awake while connected to power."
 license = "MIT"
 
 [dependencies]
-rune = { git = "https://github.com/anomalyco/rune", rev = "0ea75abef0a6caa014067a88f89518b9a04cce2b", default-features = false, features = ["accessibility", "metal-backend"] }
+rune = { git = "https://github.com/anomalyco/rune", rev = "a82183884c9b86186c97ffcc5aa587632592b84a", default-features = false, features = ["accessibility", "metal-backend"] }
+
+# Cargo doesn't inherit a dependency's patches. These mirror Rune's root
+# `[patch.crates-io]` table and must use the same rev as `rune` above. When
+# bumping Rune, re-check its root Cargo.toml for added or removed entries.
+[patch.crates-io]
+winit = { git = "https://github.com/anomalyco/rune", rev = "a82183884c9b86186c97ffcc5aa587632592b84a" }
+sctk-adwaita = { git = "https://github.com/anomalyco/rune", rev = "a82183884c9b86186c97ffcc5aa587632592b84a" }
+parley_engine = { git = "https://github.com/anomalyco/rune", rev = "a82183884c9b86186c97ffcc5aa587632592b84a" }
+wgpu-hal = { git = "https://github.com/anomalyco/rune", rev = "a82183884c9b86186c97ffcc5aa587632592b84a" }
+naga = { git = "https://github.com/anomalyco/rune", rev = "a82183884c9b86186c97ffcc5aa587632592b84a" }
+accesskit_windows = { git = "https://github.com/anomalyco/rune", rev = "a82183884c9b86186c97ffcc5aa587632592b84a" }
+accesskit_macos = { git = "https://github.com/anomalyco/rune", rev = "a82183884c9b86186c97ffcc5aa587632592b84a" }
+accesskit_atspi_common = { git = "https://github.com/anomalyco/rune", rev = "a82183884c9b86186c97ffcc5aa587632592b84a" }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.5.2"
